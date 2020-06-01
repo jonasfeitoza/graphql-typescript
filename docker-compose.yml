@@ -1,0 +1,41 @@
+version: '3.1'
+
+volumes:
+  app-mysql-data:
+    driver: local
+
+networks:
+  app-net:
+    driver: bridge
+
+services:
+  app:
+    container_name: app-graphql
+    build: .
+    command: npm run dev
+    volumes:
+      - .:/usr/app/
+      - /usr/app/node_modules
+    ports:
+      - "4000:4000"
+    links:
+      - mysql
+    networks:
+      - app-net
+    environment:
+      APOLLO_PLAYGROUND: 'true'
+
+  mysql:
+    image: mysql:5.7
+    container_name: app-mysql
+    volumes:
+      - app-mysql-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=secret
+      - MYSQL_DATABASE=application
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=secret
+    networks:
+      - app-net
