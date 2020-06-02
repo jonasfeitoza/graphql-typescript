@@ -16,9 +16,9 @@ import ExoplanetJob from './jobs/Exoplanet';
 
 const bootstrap = async () => {
   try {
-    await createConnection().then(() =>
-      console.log('Database connection successfully.'),
-    );
+    await createConnection();
+
+    console.log('Database connection sucessfully.');
 
     const schema = await buildSchema({
       resolvers: [PlanetResolver],
@@ -33,7 +33,7 @@ const bootstrap = async () => {
     console.log(`Server has started on: ${url}`);
 
     const job = new ExoplanetJob();
-    job.getExoplanets();
+    await job.getExoplanets();
   } catch (err) {
     console.error(err);
   }
