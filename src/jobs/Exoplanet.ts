@@ -1,20 +1,26 @@
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { getConnection } from 'typeorm';
 import { Planet } from '../modules/Planets/entity/Planet';
+import IPlanet from '../modules/Planets/entity/IPlanet';
 
 /**
  * @TODO: Refactor this to work with request queue
  */
 export default class Exoplanet {
-  private baseURL = 'https://api.arcsecond.io/';
+  private API: AxiosInstance = axios.create({
+    baseURL: 'https://api.arcsecond.io/',
+  });
 
-  private API: AxiosInstance;
-
-  constructor() {
-    this.API = axios.create({ baseURL: 'https://api.arcsecond.io/' });
+  /**
+   * Create a list of axios requests, based in pages qty param.
+   * */
+  private getRequests(pages: number): Promise<AxiosResponse<any>>[] {
+    return Array.from({ length: pages }).map((_, i) =>
+      this.API.get('exoplanets', { params: { page: i + 1 } }),
+    );
   }
 
-  async getExoplanets(): Promise<string> {
+  async getExoplanets(): Promise<void> {
     const planetsCount = await Planet.getRepository()
       .createQueryBuilder()
       .select('DISTINCT(`sender_id`)')
@@ -23,37 +29,24 @@ export default class Exoplanet {
     if (!planetsCount) {
       console.log('Getting new exoplanets...');
 
-      let currentPage = 1;
-      const minFetchPages = 10;
+      const pages = 10;
 
-      // eslint-disable-next-line prefer-const
-      let planets = [];
+      // dispatch promises with axios requests
+      const responses = await Promise.all(this.getRequests(pages));
 
-      const params = {
-        page: currentPage,
-      };
+      const planets: IPlanet[] = responses
+        .flatMap(({ data }) => data.results)
+        .filter(
+          (planet) =>
+            planet?.mass?.value >= 25 && planet?.mass?.unit === 'M_jup',
+        )
+        .map((planet) => ({
+          name: planet.name,
+          mass: planet.mass.value,
+          hasStation: false,
+        }));
 
-      while (currentPage <= minFetchPages) {
-        // eslint-disable-next-line no-await-in-loop
-        await this.API.get('exoplanets', params).then(({ data }) => {
-          const requestPlanets = data.results
-            .filter(
-              (planet) =>
-                planet.mass &&
-                planet.mass.value >= 25 &&
-                planet.mass.unit === 'M_jup',
-            )
-            .map((planet) => ({
-              name: planet.name,
-              mass: planet.mass.value,
-              hasStation: false,
-            }));
-
-          planets.push(...requestPlanets);
-        });
-
-        currentPage += 1;
-      }
+      console.log("Hey! We've got all exoplanets of universe. (⌐■_■)");
 
       await getConnection()
         .createQueryBuilder()
@@ -62,7 +55,5 @@ export default class Exoplanet {
         .values(planets)
         .execute();
     }
-
-    return 'Ok';
   }
 }
